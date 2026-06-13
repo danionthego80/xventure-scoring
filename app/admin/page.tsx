@@ -186,8 +186,7 @@ export default function AdminPage() {
                       >
                         Manage Questions
                       </a>
-              <button onClick={() => deleteTheme(theme.id, theme.name)}
- className="text-sm px-3 py-1.5 rounded-lg border border-red-200 text-red-600 hover:bg-red-50">Delete</button>                  </div>
+              <button onClick={() => deleteTheme(theme.id, theme.name)} className="text-sm px-3 py-1.5 rounded-lg border border-red-200 text-red-600 hover:bg-red-50">Delete</button>                  </div>
                 ))}
               </div>
             )}
