@@ -56,6 +56,15 @@ export default function AdminPage() {
     if (!error && data) setGames(data);
   }
 
+    async function deleteTheme(themeId: string, themeName: string) {
+          if (!window.confirm('Delete theme ' + themeName + ' and all its questions? This cannot be undone.')) return;
+          const { error: qErr } = await supabase.from('mg_questions').delete().eq('theme_id', themeId);
+          if (qErr) { window.alert('Error: ' + qErr.message); return; }
+          const { error: tErr } = await supabase.from('mg_themes').delete().eq('id', themeId);
+          if (tErr) { window.alert('Error: ' + tErr.message); return; }
+          fetchThemes();
+    }
+
   if (!authenticated) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#0F3460' }}>
@@ -177,7 +186,8 @@ export default function AdminPage() {
                       >
                         Manage Questions
                       </a>
-                    </div>
+                                    <button onClick={() => deleteTheme(theme.id, theme.name)
+ className="text-sm px-3 py-1.5 rounded-lg border border-red-200 text-red-600 hover:bg-red-50">Delete</button>                    </div>
                   </div>
                 ))}
               </div>
