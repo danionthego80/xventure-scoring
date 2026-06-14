@@ -58,11 +58,10 @@ export default function AdminPage() {
 
     async function deleteTheme(themeId: string, themeName: string) {
           if (!window.confirm('Delete theme ' + themeName + ' and all its questions? This cannot be undone.')) return;
-          const { error: qErr } = await supabase.from('mg_questions').delete().eq('theme_id', themeId);
-          if (qErr) { window.alert('Error: ' + qErr.message); return; }
-          const { error: tErr } = await supabase.from('mg_themes').delete().eq('id', themeId);
-          if (tErr) { window.alert('Error: ' + tErr.message); return; }
-          fetchThemes();
+    const res = await fetch('/api/admin/themes/' + themeId, { method: 'DELETE' });
+            const data = await res.json();
+                    if (!res.ok) { window.alert('Error: ' + (data.error || 'Unknown error')); return; }
+                            fetchThemes();
     }
 
   if (!authenticated) {
