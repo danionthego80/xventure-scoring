@@ -56,6 +56,10 @@ export default function GameDetailPage({ params }: { params: { gameId: string } 
   const [loading, setLoading] = useState(true);
   const [statusSaving, setStatusSaving] = useState(false);
   const [copyMsg, setCopyMsg] = useState('');
+  const [scheduledStart, setScheduledStart] = useState<string>('')
+  const [scheduledEnd, setScheduledEnd] = useState<string>('')
+  const [savingSchedule, setSavingSchedule] = useState(false)
+  const [scheduleMsg, setScheduleMsg] = useState<string>('')
 
   const loadGame = useCallback(async () => {
     const { data } = await supabase
@@ -64,6 +68,8 @@ export default function GameDetailPage({ params }: { params: { gameId: string } 
       .eq('id', gameId)
       .single();
     if (data) setGame(data as Game);
+        setScheduledStart(data.scheduled_start ? data.scheduled_start.slice(0, 16) : '')
+        setScheduledEnd(data.scheduled_end ? data.scheduled_end.slice(0, 16) : '')
   }, [gameId]);
 
   const loadTeams = useCallback(async () => {
@@ -102,6 +108,20 @@ export default function GameDetailPage({ params }: { params: { gameId: string } 
     setStatusSaving(false);
   }
 
+
+  async function handleSaveSchedule() {
+    setSavingSchedule(true)
+    setScheduleMsg('')
+    const startVal = scheduledStart ? new Date(scheduledStart).toISOString() : null
+    const endVal = scheduledEnd ? new Date(scheduledEnd).toISOString() : null
+    const { error } = await supabase
+      .from('mg_games')
+      .update({ scheduled_start: startVal, scheduled_end: endVal })
+      .eq('id', params.gameId)
+    setSavingSchedule(false)
+    setScheduleMsg(error ? 'Error: ' + error.message : 'Schedule saved!')
+    if (!error) setTimeout(() => setScheduleMsg(''), 3000)
+  }
   function copyLink() {
     const url = `${window.location.origin}/score/${gameId}`;
     navigator.clipboard.writeText(url).then(() => {
@@ -113,7 +133,7 @@ export default function GameDetailPage({ params }: { params: { gameId: string } 
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#f0f4f8' }}>
-        <p className="text-gray-400">Loading…</p>
+        <p className="text-gray-400">Loadingâ¦</p>
       </div>
     );
   }
@@ -133,7 +153,7 @@ export default function GameDetailPage({ params }: { params: { gameId: string } 
       {/* Header */}
       <div className="text-white px-6 py-4" style={{ backgroundColor: '#0F3460' }}>
         <div className="max-w-4xl mx-auto flex items-center gap-4">
-          <a href="/admin" className="text-blue-200 hover:text-white text-sm">← Admin</a>
+          <a href="/admin" className="text-blue-200 hover:text-white text-sm">â Admin</a>
           <span className="text-blue-300">/</span>
           <h1 className="text-lg font-bold">{game.title}</h1>
           <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${STATUS_COLORS[game.status]}`}>
@@ -149,18 +169,42 @@ export default function GameDetailPage({ params }: { params: { gameId: string } 
           <div className="flex items-start justify-between flex-wrap gap-4">
             <div className="space-y-1">
               <p className="text-gray-500 text-sm">
-                Theme: <span className="text-gray-800 font-medium">{game.mg_themes?.name ?? '—'}</span>
+                Theme: <span className="text-gray-800 font-medium">{game.mg_themes?.name ?? 'â'}</span>
               </p>
-              {game.scheduled_start && (
-                <p className="text-gray-500 text-sm">
-                  Start: <span className="text-gray-800">{new Date(game.scheduled_start).toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Australia/Sydney' })}</span>
-                </p>
-              )}
-              {game.scheduled_end && (
-                <p className="text-gray-500 text-sm">
-                  End: <span className="text-gray-800">{new Date(game.scheduled_end).toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Australia/Sydney' })}</span>
-                </p>
-              )}
+          {/* Schedule Section */}
+          <div className='mt-6 p-4 bg-gray-800 rounded-lg'>
+            <h3 className='text-lg font-semibold text-white mb-4'>Session Schedule</h3>
+            <div className='space-y-4'>
+              <div>
+                <label className='block text-sm font-medium text-gray-300 mb-1'>Start Date & Time</label>
+                <input
+                  type='datetime-local'
+                  value={scheduledStart}
+                  onChange={e => setScheduledStart(e.target.value)}
+                  className='bg-gray-700 text-white rounded px-3 py-2 w-full border border-gray-600 focus:border-blue-500 focus:outline-none'
+                />
+              </div>
+              <div>
+                <label className='block text-sm font-medium text-gray-300 mb-1'>End Date & Time</label>
+                <input
+                  type='datetime-local'
+                  value={scheduledEnd}
+                  onChange={e => setScheduledEnd(e.target.value)}
+                  className='bg-gray-700 text-white rounded px-3 py-2 w-full border border-gray-600 focus:border-blue-500 focus:outline-none'
+                />
+              </div>
+              <div className='flex items-center gap-3'>
+                <button
+                  onClick={handleSaveSchedule}
+                  disabled={savingSchedule}
+                  className='px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 font-medium'
+                >
+                  {savingSchedule ? 'Saving...' : 'Save Schedule'}
+                </button>
+                {scheduleMsg && <span className={scheduleMsg.startsWith('Error') ? 'text-red-400 text-sm' : 'text-green-400 text-sm'}>{scheduleMsg}</span>}
+              </div>
+            </div>
+          </div>
               <p className="text-gray-500 text-sm">
                 Points/Q: <span className="text-gray-800">{game.points_per_question}</span>
                 {game.penalty_mode !== 'none' && <span className="ml-2 text-orange-600 text-xs">({game.penalty_mode} penalty)</span>}
@@ -176,7 +220,7 @@ export default function GameDetailPage({ params }: { params: { gameId: string } 
                   className="text-white px-5 py-2 rounded-lg font-medium text-sm transition-opacity hover:opacity-90 disabled:opacity-50"
                   style={{ backgroundColor: game.status === 'draft' ? '#16a34a' : '#6b7280' }}
                 >
-                  {statusSaving ? 'Saving…' : STATUS_NEXT_LABEL[game.status]}
+                  {statusSaving ? 'Savingâ¦' : STATUS_NEXT_LABEL[game.status]}
                 </button>
               )}
               <a
@@ -210,7 +254,7 @@ export default function GameDetailPage({ params }: { params: { gameId: string } 
               rel="noopener noreferrer"
               className="text-sm px-4 py-2 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors"
             >
-              Open ↗
+              Open â
             </a>
           </div>
         </div>
@@ -223,7 +267,7 @@ export default function GameDetailPage({ params }: { params: { gameId: string } 
               onClick={() => { loadTeams(); }}
               className="text-xs text-gray-500 hover:text-gray-800 transition-colors"
             >
-              ↻ Refresh
+              â» Refresh
             </button>
           </div>
 
@@ -236,7 +280,7 @@ export default function GameDetailPage({ params }: { params: { gameId: string } 
                   <span className="w-6 text-center text-sm font-bold text-gray-400">{i + 1}</span>
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-gray-800 text-sm">{team.name}</p>
-                    {team.company && <p className="text-xs text-gray-400">{team.company}{team.captain_name ? ` · ${team.captain_name}` : ''}</p>}
+                    {team.company && <p className="text-xs text-gray-400">{team.company}{team.captain_name ? ` Â· ${team.captain_name}` : ''}</p>}
                   </div>
                   <div className="text-right">
                     <p className="font-bold text-gray-800">{team.total_score} pts</p>
