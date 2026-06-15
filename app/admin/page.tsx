@@ -18,6 +18,11 @@ export default function AdminPage() {
   const [themes, setThemes] = useState<any[]>([]);
   const [games, setGames] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [editScheduleId, setEditScheduleId] = useState<string | null>(null)
+  const [editStart, setEditStart] = useState<string>('')
+  const [editEnd, setEditEnd] = useState<string>('')
+  const [savingSchedule, setSavingSchedule] = useState(false)
+  const [scheduleMsg, setScheduleMsg] = useState<string>('')
 
   const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || 'xventure-admin-2026';
 
@@ -54,6 +59,24 @@ export default function AdminPage() {
       .select('*, mg_themes(name)')
       .order('created_at', { ascending: false });
     if (!error && data) setGames(data);
+  }
+
+  async function handleSaveSchedule(gameId: string) {
+    setSavingSchedule(true)
+    setScheduleMsg('')
+    const startVal = editStart ? new Date(editStart).toISOString() : null
+    const endVal = editEnd ? new Date(editEnd).toISOString() : null
+    const { error } = await supabase
+      .from('mg_games')
+      .update({ scheduled_start: startVal, scheduled_end: endVal })
+      .eq('id', gameId)
+    setSavingSchedule(false)
+    if (error) {
+      setScheduleMsg('Error: ' + error.message)
+    } else {
+      setScheduleMsg('Saved!')
+      setTimeout(() => { setEditScheduleId(null); setScheduleMsg('') }, 1500)
+    }
   }
 
     async function deleteTheme(themeId: string, themeName: string) {
@@ -228,7 +251,7 @@ export default function AdminPage() {
                               timeStyle: 'short',
                               timeZone: 'Australia/Sydney'
                             })}
-                            {game.scheduled_end && ` – ${new Date(game.scheduled_end).toLocaleString('en-AU', {
+                            {game.scheduled_end && ` â ${new Date(game.scheduled_end).toLocaleString('en-AU', {
                               timeStyle: 'short',
                               timeZone: 'Australia/Sydney'
                             })}`}
@@ -250,7 +273,7 @@ export default function AdminPage() {
                         rel="noopener noreferrer"
                         className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors"
                       >
-                        View Scoring Link ↗
+                        View Scoring Link â
                       </a>
                       <a
                         href={`/admin/games/${game.id}`}
@@ -265,6 +288,28 @@ export default function AdminPage() {
                         Copy Link
                       </button>
                     </div>
+              {editScheduleId === game.id ? (
+                <div className='mt-3 p-3 bg-gray-50 rounded-lg border border-gray-200'>
+                  <p className='text-sm font-semibold text-gray-700 mb-2'>Edit Session Schedule</p>
+                  <div className='flex flex-col gap-2'>
+                    <div>
+                      <label className='text-xs text-gray-500 block mb-1'>Start Date &amp; Time</label>
+                      <input type='datetime-local' value={editStart} onChange={e => setEditStart(e.target.value)} className='border border-gray-300 rounded px-2 py-1 text-sm w-full' />
+                    </div>
+                    <div>
+                      <label className='text-xs text-gray-500 block mb-1'>End Date &amp; Time</label>
+                      <input type='datetime-local' value={editEnd} onChange={e => setEditEnd(e.target.value)} className='border border-gray-300 rounded px-2 py-1 text-sm w-full' />
+                    </div>
+                    <div className='flex items-center gap-2 mt-1'>
+                      <button onClick={() => handleSaveSchedule(game.id)} disabled={savingSchedule} className='px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 disabled:opacity-50'>{savingSchedule ? 'Saving...' : 'Save'}</button>
+                      <button onClick={() => { setEditScheduleId(null); setScheduleMsg('') }} className='px-3 py-1 bg-gray-200 text-gray-700 text-sm rounded hover:bg-gray-300'>Cancel</button>
+                      {scheduleMsg && <span className={scheduleMsg.startsWith('Error') ? 'text-red-500 text-xs' : 'text-green-600 text-xs'}>{scheduleMsg}</span>}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <button onClick={() => { setEditScheduleId(game.id); setEditStart(game.scheduled_start ? game.scheduled_start.slice(0,16) : ''); setEditEnd(game.scheduled_end ? game.scheduled_end.slice(0,16) : '') }} className='mt-2 text-sm text-blue-600 hover:underline'>✏️ Edit Schedule</button>
+              )}
                   </div>
                 ))}
               </div>
