@@ -30,8 +30,9 @@ No Stripe keys are needed for the scoring app.
 | Variable | Description |
 |----------|-------------|
 | NEXT_PUBLIC_SUPABASE_URL | Supabase project URL |
-| NEXT_PUBLIC_SUPABASE_ANON_KEY | Supabase anon key |
-| NEXT_PUBLIC_ADMIN_PASSWORD | Password for /admin login |
+| NEXT_PUBLIC_SUPABASE_ANON_KEY | Supabase anon key (player scoring pages) |
+| SUPABASE_SERVICE_ROLE_KEY | Server-only key used for all admin reads and writes |
+| ADMIN_PASSWORD | Password for /admin login (server-only, checked in `/api/admin/login`) |
 
 ## Related
 

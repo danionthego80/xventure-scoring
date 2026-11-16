@@ -1,12 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+import { adminDb as supabase } from '../../lib/adminDb';
 
 type Tab = 'themes' | 'games';
 
@@ -24,16 +19,45 @@ export default function AdminPage() {
   const [savingSchedule, setSavingSchedule] = useState(false)
   const [scheduleMsg, setScheduleMsg] = useState<string>('')
 
-  const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || 'xventure-admin-2026';
+  const [checkingSession, setCheckingSession] = useState(true);
+  const [signingIn, setSigningIn] = useState(false);
 
-  function handleLogin(e: React.FormEvent) {
+  // Already signed in? (The session cookie is checked on the server.)
+  useEffect(() => {
+    fetch('/api/admin/login', { credentials: 'same-origin' })
+      .then(r => r.json())
+      .then(d => { if (d.authenticated) setAuthenticated(true); })
+      .catch(() => {})
+      .finally(() => setCheckingSession(false));
+  }, []);
+
+  async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
-    if (password === ADMIN_PASSWORD) {
-      setAuthenticated(true);
-      setPasswordError('');
-    } else {
-      setPasswordError('Incorrect password. Please try again.');
+    setSigningIn(true);
+    setPasswordError('');
+    try {
+      const res = await fetch('/api/admin/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ password }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.authenticated) {
+        setAuthenticated(true);
+        setPassword('');
+      } else {
+        setPasswordError(data.error || 'Incorrect password. Please try again.');
+      }
+    } catch {
+      setPasswordError('Could not reach the server. Please try again.');
     }
+    setSigningIn(false);
+  }
+
+  async function handleSignOut() {
+    await fetch('/api/admin/login', { method: 'DELETE', credentials: 'same-origin' }).catch(() => {});
+    setAuthenticated(false);
   }
 
   useEffect(() => {
@@ -87,6 +111,10 @@ export default function AdminPage() {
                             fetchThemes();
     }
 
+  if (!authenticated && checkingSession) {
+    return <div className="min-h-screen" style={{ backgroundColor: '#0F3460' }} />;
+  }
+
   if (!authenticated) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#0F3460' }}>
@@ -113,10 +141,11 @@ export default function AdminPage() {
             )}
             <button
               type="submit"
-              className="w-full text-white rounded-lg py-2 font-semibold transition-opacity hover:opacity-90"
+              disabled={signingIn}
+              className="w-full text-white rounded-lg py-2 font-semibold transition-opacity hover:opacity-90 disabled:opacity-60"
               style={{ backgroundColor: '#0F3460' }}
             >
-              Sign In
+              {signingIn ? 'Signing in…' : 'Sign In'}
             </button>
           </form>
         </div>
@@ -134,7 +163,7 @@ export default function AdminPage() {
             <p className="text-blue-200 text-sm">Admin Control Panel</p>
           </div>
           <button
-            onClick={() => setAuthenticated(false)}
+            onClick={handleSignOut}
             className="text-blue-200 hover:text-white text-sm transition-colors"
           >
             Sign Out
