@@ -11,7 +11,7 @@ const WRITE_METHODS = new Set(['insert', 'update', 'upsert', 'delete']);
 
 class AdminQuery implements PromiseLike<Result> {
   private ops: any[][] = [];
-  constructor(private table: string) {}
+  constructor(private table: string, private quiet = false) {}
 
   private add(method: string, args: any[]) {
     this.ops.push([method, ...args]);
@@ -52,7 +52,7 @@ class AdminQuery implements PromiseLike<Result> {
       result = { data: null, error: { message: e?.message || 'Network error' } };
     }
     // Never fail silently: tell the admin if a change did not save.
-    if (result.error && isWrite) {
+    if (result.error && isWrite && !this.quiet) {
       window.alert('That change did not save: ' + result.error.message);
     }
     return result;
@@ -69,5 +69,9 @@ class AdminQuery implements PromiseLike<Result> {
 export const adminDb = {
   from(table: string) {
     return new AdminQuery(table);
+  },
+  // Same, but no pop-up on failure: for code that shows its own error message.
+  quietFrom(table: string) {
+    return new AdminQuery(table, true);
   },
 };

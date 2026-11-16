@@ -153,13 +153,34 @@ export default function ThemeDetailPage({ params }: { params: { themeId: string 
     if (formOptions.some(o => !o.text.trim())) { setFormError('All answer options must have text.'); return; }
     setFormSaving(true); setFormError('');
     const nextOrder = editingId ? questions.find(q => q.id === editingId)?.order_num ?? questions.length + 1 : questions.length + 1;
+    const fail = (msg: string) => { setFormError(msg); setFormSaving(false); loadQuestions(); };
+    const optionRow = (o: AnswerOption, i: number) => ({ label: LABELS[i], text: o.text.trim(), is_correct: o.is_correct, order_num: i + 1 });
+
     if (editingId) {
-      await supabase.from('mg_questions').update({ title: formTitle.trim(), instruction: formInstruction.trim() || null, points: formPoints, media_url: formMedia.trim() || null, notes: formNotes.trim() || null, link: formLink.trim() || null }).eq('id', editingId);
-      await supabase.from('mg_answer_options').delete().eq('question_id', editingId);
-      await supabase.from('mg_answer_options').insert(formOptions.map(o => ({ question_id: editingId, label: o.label, text: o.text.trim(), is_correct: o.is_correct, order_num: o.order_num })));
+      const { error: qErr } = await supabase.quietFrom('mg_questions').update({ title: formTitle.trim(), instruction: formInstruction.trim() || null, points: formPoints, media_url: formMedia.trim() || null, notes: formNotes.trim() || null, link: formLink.trim() || null }).eq('id', editingId);
+      if (qErr) return fail('Could not save the question: ' + qErr.message);
+
+      // Update answers in place (keeps their IDs, so answers teams have already
+      // chosen in past games stay linked), add new ones, then remove deleted ones.
+      const originalIds = (questions.find(q => q.id === editingId)?.mg_answer_options || []).map(o => o.id).filter(Boolean) as string[];
+      const keptIds = new Set(formOptions.map(o => o.id).filter(Boolean) as string[]);
+      for (let i = 0; i < formOptions.length; i++) {
+        const o = formOptions[i];
+        const { error } = o.id
+          ? await supabase.quietFrom('mg_answer_options').update(optionRow(o, i)).eq('id', o.id)
+          : await supabase.quietFrom('mg_answer_options').insert({ question_id: editingId, ...optionRow(o, i) });
+        if (error) return fail('Could not save answer ' + LABELS[i] + ': ' + error.message);
+      }
+      const removed = originalIds.filter(id => !keptIds.has(id));
+      if (removed.length > 0) {
+        const { error } = await supabase.quietFrom('mg_answer_options').delete().in('id', removed);
+        if (error) return fail('Your changes were saved, but a removed answer could not be deleted because a team has already chosen it in a game.');
+      }
     } else {
-      const { data: qData } = await supabase.from('mg_questions').insert({ theme_id: themeId, order_num: nextOrder, title: formTitle.trim(), instruction: formInstruction.trim() || null, points: formPoints, media_url: formMedia.trim() || null, notes: formNotes.trim() || null, link: formLink.trim() || null }).select().single();
-      if (qData) await supabase.from('mg_answer_options').insert(formOptions.map(o => ({ question_id: qData.id, label: o.label, text: o.text.trim(), is_correct: o.is_correct, order_num: o.order_num })));
+      const { data: qData, error: qErr } = await supabase.quietFrom('mg_questions').insert({ theme_id: themeId, order_num: nextOrder, title: formTitle.trim(), instruction: formInstruction.trim() || null, points: formPoints, media_url: formMedia.trim() || null, notes: formNotes.trim() || null, link: formLink.trim() || null }).select().single();
+      if (qErr || !qData) return fail('Could not add the question: ' + (qErr?.message || 'unknown error'));
+      const { error } = await supabase.quietFrom('mg_answer_options').insert(formOptions.map((o, i) => ({ question_id: qData.id, ...optionRow(o, i) })));
+      if (error) return fail('The question was added but its answers could not be saved: ' + error.message);
     }
     setShowForm(false); setFormSaving(false); loadQuestions();
   }
